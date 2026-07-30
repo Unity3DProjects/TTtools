@@ -200,4 +200,13 @@ public class ADManager : Single<ADManager>
         AdsControler.Instance.ShowMoreGames();
 #endif
     }
+
+    public void ShowGameClub()
+    {
+#if ADE_NO_ADS
+        Debug.Log("ADManager: 无广模式，跳过游戏圈");
+#else
+        AdsControler.Instance.ShowGameClub();
+#endif
+    }
 }

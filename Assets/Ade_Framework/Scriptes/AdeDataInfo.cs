@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "New AdeDataInfo", menuName = "MyTools/AdeDataInfo")]
@@ -18,6 +17,12 @@ public class AdeDataInfo : ScriptableObject
 
     [Header("推荐流获客ID")]
     public List<string> FeedAcquisitionContentIDs = new List<string>();
+
+    [Header("更多游戏")]
+    public MoreGamesData MoreGames = new MoreGamesData();
+
+    [Header("游戏圈")]
+    public GameClubData GameClub = new GameClubData();
 
     [HideInInspector]
     public List<string> FeedContentIDs = new List<string>();

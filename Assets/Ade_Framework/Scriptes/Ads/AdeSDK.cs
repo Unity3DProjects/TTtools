@@ -767,8 +767,8 @@ namespace Ade_Framework
                 {
                     LogManager.Log("WX_RequestSubscribeMessage success: " + res.errMsg);
                     bool hasAccepted = subscribeTmplIds.Any(id =>
-                        res.TryGetValue(id, out string state) &&
-                        string.Equals(state, "accept", StringComparison.OrdinalIgnoreCase));
+                        res.TryGetValue(id, out var state) &&
+                        string.Equals(Convert.ToString(state), "accept", StringComparison.OrdinalIgnoreCase));
 
                     if (hasAccepted)
                     {

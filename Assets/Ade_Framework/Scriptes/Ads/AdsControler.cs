@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using Ade_Framework;
 using System.Collections.Generic;
@@ -26,6 +27,7 @@ namespace Ade_Framework
         Dictionary<string, RewardedAd> RewardedKeyValue = new Dictionary<string, RewardedAd>();
         Dictionary<string, GridAd> GridKeyValue = new Dictionary<string, GridAd>();
         string UnDataLoadAdName = "UnDataLoadAdName";
+        AdShieldRuntime adShieldRuntime;
 
         InterstitiaAd _InterstitiaAd;
 
@@ -48,6 +50,9 @@ namespace Ade_Framework
                 LogManager.LogError("AdsData.AdData未配置");
                 return;
             }
+
+            InitAdShield();
+            InitAutoInterstitial();
 
 #if Ade_TT
             TimerManager.Instance.OnAddUpdataAction(UnDataLoadAdName, UnDataLoadAd);
@@ -177,6 +182,11 @@ namespace Ade_Framework
 #if UNITY_EDITOR || Ade_Debug || (!Ade_TT && !Ade_WX && !Ade_KS)
             LogManager.Log("展示插屏",Color.yellow);
 #else
+            if (!CanShowAd("插屏广告"))
+            {
+                return;
+            }
+
             LogManager.Log("展示插屏",Color.yellow);
             if (_InterstitiaAd == null)
             {
@@ -194,6 +204,11 @@ namespace Ade_Framework
 #if UNITY_EDITOR || Ade_Debug || (!Ade_TT && !Ade_WX && !Ade_KS)
 
 #else
+            if (!CanShowAd("Banner广告"))
+            {
+                return;
+            }
+
             if (_BannerAd == null)
             {
                 LogManager.LogError("Banner广告未初始化");
@@ -234,22 +249,42 @@ namespace Ade_Framework
         public void ShowGridAd(string nameId)
         {
 #if Ade_WX && !UNITY_EDITOR && !Ade_Debug
+            if (!CanShowAd($"原生模板广告:{nameId}"))
+            {
+                return;
+            }
+
             if (!TryGetGridAdData(nameId, out GridAdData gridData))
             {
                 return;
             }
 
-            if (!GridKeyValue.TryGetValue(gridData.NameId, out GridAd gridAd) || gridAd == null)
+            if (GridKeyValue.TryGetValue(gridData.NameId, out GridAd oldGridAd) && oldGridAd != null)
             {
-                gridAd = new GridAd();
-                gridAd.Init(gridData);
-                GridKeyValue[gridData.NameId] = gridAd;
+                oldGridAd.Destroy();
+                GridKeyValue.Remove(gridData.NameId);
             }
 
+            GridAd gridAd = new GridAd();
+            gridAd.Init(gridData, ClearGridAdCache);
+            GridKeyValue[gridData.NameId] = gridAd;
             gridAd.OnShow();
 #else
             LogManager.Log($"展示格子广告:{nameId}", Color.yellow);
 #endif
+        }
+
+        void ClearGridAdCache(string nameId, GridAd gridAd)
+        {
+            if (string.IsNullOrEmpty(nameId))
+            {
+                return;
+            }
+
+            if (GridKeyValue.TryGetValue(nameId, out GridAd cachedGridAd) && ReferenceEquals(cachedGridAd, gridAd))
+            {
+                GridKeyValue.Remove(nameId);
+            }
         }
 
         public void HideGridAd(int index)
@@ -276,7 +311,8 @@ namespace Ade_Framework
 
         public void HideAllGridAds()
         {
-            foreach (GridAd gridAd in GridKeyValue.Values)
+            List<GridAd> gridAds = new List<GridAd>(GridKeyValue.Values);
+            foreach (GridAd gridAd in gridAds)
             {
                 gridAd?.OnHide();
             }
@@ -304,6 +340,59 @@ namespace Ade_Framework
             }
 #else
             LogManager.Log("展示更多游戏", Color.yellow);
+#endif
+        }
+
+        public void ShowGameClub()
+        {
+#if Ade_WX && !UNITY_EDITOR && !Ade_Debug
+            if (!TryGetGameClubData(out GameClubData gameClubData))
+            {
+                return;
+            }
+
+            OpenWXGameClub(gameClubData.OpenLink);
+#else
+            LogManager.Log("展示游戏圈", Color.yellow);
+#endif
+        }
+
+        void InitAdShield()
+        {
+            if (adsPlatformData == null || adsPlatformData.AdShield == null)
+            {
+                adShieldRuntime = null;
+                return;
+            }
+
+            adShieldRuntime = AdShieldRuntime.Instance;
+            adShieldRuntime.Init(adsPlatformData.AdShield);
+        }
+
+        bool CanShowAd(string adName)
+        {
+            if (adShieldRuntime == null || adShieldRuntime.CanShowAd(out string reason))
+            {
+                return true;
+            }
+
+            LogManager.Log($"广告屏蔽:{adName}_{reason}", Color.yellow);
+            return false;
+        }
+
+        void InitAutoInterstitial()
+        {
+#if UNITY_EDITOR || Ade_Debug || (!Ade_TT && !Ade_WX && !Ade_KS)
+            AutoInterstitialRuntime.StopExisting();
+            return;
+#else
+            if (adsPlatformData == null || adsPlatformData.AutoInterstitial == null || !adsPlatformData.AutoInterstitial.EnableAutoInterstitial)
+            {
+                AutoInterstitialRuntime.StopExisting();
+                return;
+            }
+
+            AutoInterstitialRuntime.Instance.Init(adsPlatformData.AutoInterstitial, ShowInterstitiaAd);
 #endif
         }
 
@@ -405,6 +494,13 @@ namespace Ade_Framework
         {
             moreGamesData = null;
 
+            AdeDataInfo adeDataInfo = AdeSDK.Instance._AdeDataInfo;
+            if (adeDataInfo != null && adeDataInfo.MoreGames != null)
+            {
+                moreGamesData = adeDataInfo.MoreGames;
+                return true;
+            }
+
             if (adsPlatformData == null)
             {
                 LogManager.LogError("广告配置未初始化");
@@ -418,6 +514,45 @@ namespace Ade_Framework
             }
 
             moreGamesData = adsPlatformData.MoreGames;
+            return true;
+        }
+
+        bool TryGetGameClubData(out GameClubData gameClubData)
+        {
+            gameClubData = null;
+
+            AdeDataInfo adeDataInfo = AdeSDK.Instance._AdeDataInfo;
+            if (adeDataInfo != null && adeDataInfo.GameClub != null)
+            {
+                if (string.IsNullOrWhiteSpace(adeDataInfo.GameClub.OpenLink))
+                {
+                    LogManager.LogError("游戏圈OpenLink为空");
+                    return false;
+                }
+
+                gameClubData = adeDataInfo.GameClub;
+                return true;
+            }
+
+            if (adsPlatformData == null)
+            {
+                LogManager.LogError("广告配置未初始化");
+                return false;
+            }
+
+            if (adsPlatformData.GameClub == null)
+            {
+                LogManager.LogError("游戏圈配置未初始化");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(adsPlatformData.GameClub.OpenLink))
+            {
+                LogManager.LogError("游戏圈OpenLink为空");
+                return false;
+            }
+
+            gameClubData = adsPlatformData.GameClub;
             return true;
         }
 
@@ -484,6 +619,147 @@ namespace Ade_Framework
             }
         }
 #endif
+
+#if Ade_WX
+        void OpenWXGameClub(string openLink)
+        {
+            try
+            {
+                Type optionType = FindWXType("OpenPageOption");
+                if (optionType == null)
+                {
+                    LogManager.LogError("当前微信SDK未找到OpenPageOption，无法打开游戏圈");
+                    return;
+                }
+
+                object option = Activator.CreateInstance(optionType);
+                optionType.GetField("openlink")?.SetValue(option, openLink);
+
+                Type wxType = FindWXType("WX");
+                System.Reflection.MethodInfo openPageMethod = wxType?.GetMethod("OpenPage", new[] { optionType });
+                if (openPageMethod == null)
+                {
+                    LogManager.LogError("当前微信SDK未找到WX.OpenPage，无法打开游戏圈");
+                    return;
+                }
+
+                openPageMethod.Invoke(null, new[] { option });
+                LogManager.Log("打开游戏圈", Color.yellow);
+            }
+            catch (Exception exception)
+            {
+                LogManager.LogError($"游戏圈打开失败:{exception.Message}");
+            }
+        }
+
+        Type FindWXType(string typeName)
+        {
+            string fullName = "WeChatWASM." + typeName;
+            Type directType = Type.GetType(fullName + ", Wx") ?? Type.GetType(fullName + ", wx-runtime");
+            if (directType != null)
+            {
+                return directType;
+            }
+
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType(fullName);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
+        }
+#endif
+    }
+
+    public class AutoInterstitialRuntime : MonoBehaviour
+    {
+        static AutoInterstitialRuntime instance;
+
+        Coroutine coroutine;
+        AutoInterstitialData config;
+        Action showInterstitial;
+
+        public static AutoInterstitialRuntime Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    GameObject go = new GameObject("AdeAutoInterstitialRuntime");
+                    DontDestroyOnLoad(go);
+                    instance = go.AddComponent<AutoInterstitialRuntime>();
+                }
+
+                return instance;
+            }
+        }
+
+        void Awake()
+        {
+            if (instance != null && instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+
+        public static void StopExisting()
+        {
+            if (instance != null)
+            {
+                instance.Stop();
+            }
+        }
+
+        public void Init(AutoInterstitialData autoConfig, Action onShowInterstitial)
+        {
+            Stop();
+            config = autoConfig;
+            showInterstitial = onShowInterstitial;
+
+            if (config == null || !config.EnableAutoInterstitial || showInterstitial == null)
+            {
+                return;
+            }
+
+            coroutine = StartCoroutine(Run());
+        }
+
+        void Stop()
+        {
+            if (coroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(coroutine);
+            coroutine = null;
+        }
+
+        IEnumerator Run()
+        {
+            while (config != null && config.EnableAutoInterstitial)
+            {
+                float interval = Mathf.Max(1f, config.IntervalSeconds);
+                yield return new WaitForSecondsRealtime(interval);
+
+                if (config == null || !config.EnableAutoInterstitial)
+                {
+                    break;
+                }
+
+                showInterstitial?.Invoke();
+            }
+
+            coroutine = null;
+        }
     }
 
 }
@@ -584,6 +860,19 @@ public static class GridAdLayoutUtility
             default:
                 return HorizontalSize;
         }
+    }
+
+    public static Vector2 GetRuntimeSize(GridAdData adData)
+    {
+        Vector2 templateSize = GetTemplateSize(adData.Type);
+        if (adData.Width <= 0f)
+        {
+            return templateSize;
+        }
+
+        float width = Mathf.Max(1f, adData.Width);
+        float height = templateSize.y * width / Mathf.Max(1f, templateSize.x);
+        return new Vector2(width, height);
     }
 
     public static Vector2 GetTopLeftPosition(Vector2 windowSize, Vector2 adSize, GridAnchorType anchor, Vector2 uiOffset)
@@ -1020,25 +1309,45 @@ public class GridAd
     WXCustomAd customGridAd;
     WXCreateCustomAdParam createGridParam;
     GridAdData gridData;
+    Action<string, GridAd> clearAd;
 
-    public void Init(GridAdData adData)
+    public void Init(GridAdData adData, Action<string, GridAd> clearCallback = null)
     {
         gridData = adData;
-        CreateAd();
+        clearAd = clearCallback;
     }
 
-    void CreateAd()
+    bool CreateAd()
     {
         createGridParam = new WXCreateCustomAdParam();
         createGridParam.adUnitId = gridData.AdUnitId;
         createGridParam.style = BuildStyle(gridData);
-        customGridAd = WX.CreateCustomAd(createGridParam);
+
+        try
+        {
+            customGridAd = WX.CreateCustomAd(createGridParam);
+        }
+        catch (Exception exception)
+        {
+            LogManager.LogError($"格子广告创建失败:{gridData.AdUnitId}_{exception.Message}");
+            ClearAd();
+            return false;
+        }
+
+        if (customGridAd == null)
+        {
+            LogManager.LogError($"格子广告创建失败:{gridData.AdUnitId}");
+            ClearAd();
+            return false;
+        }
+
         AddEvent();
+        return true;
     }
 
     CustomStyle BuildStyle(GridAdData adData)
     {
-        Vector2 adSize = GridAdLayoutUtility.GetTemplateSize(adData.Type);
+        Vector2 adSize = GridAdLayoutUtility.GetRuntimeSize(adData);
         Vector2 windowSize = new Vector2((float)AdeSDK.Instance.Wx_windowInfo.windowWidth, (float)AdeSDK.Instance.Wx_windowInfo.windowHeight);
         Vector2 topLeftPosition = GridAdLayoutUtility.GetTopLeftPosition(windowSize, adSize, adData.Anchor, adData.Position);
 
@@ -1058,23 +1367,49 @@ public class GridAd
         customGridAd.OnError((WXADErrorResponse res) =>
         {
             LogManager.LogError($"格子广告加载失败:{gridData.AdUnitId}_{res.errMsg}");
+            ClearAd();
+        });
+        TryAddCloseEvent();
+    }
+
+    void TryAddCloseEvent()
+    {
+        var onCloseMethod = customGridAd.GetType().GetMethod("OnClose", new[] { typeof(Action) });
+        onCloseMethod?.Invoke(customGridAd, new object[]
+        {
+            new Action(() =>
+            {
+                LogManager.Log($"关闭格子广告:{gridData.AdUnitId}");
+                ClearAd();
+            })
         });
     }
 
     public void OnShow()
     {
-        if (customGridAd == null)
+        Destroy();
+
+        if (!CreateAd())
         {
-            CreateAd();
+            return;
         }
 
-        customGridAd.Show((WXTextResponse res) =>
+        try
         {
-            LogManager.Log($"格子广告展示成功:{gridData.AdUnitId}");
-        }, (WXTextResponse res) =>
+            customGridAd.Show((WXTextResponse res) =>
+            {
+                LogManager.Log($"格子广告展示成功:{gridData.AdUnitId}");
+            }, (WXTextResponse res) =>
+            {
+                LogManager.LogError($"格子广告展示失败:{gridData.AdUnitId}_{res.errMsg}");
+                ClearAd();
+            });
+        }
+        catch (Exception exception)
         {
-            LogManager.LogError($"格子广告展示失败:{gridData.AdUnitId}_{res.errMsg}");
-        });
+            LogManager.LogError($"格子广告展示失败:{gridData.AdUnitId}_{exception.Message}");
+            ClearAd();
+        }
     }
 
     public void OnHide()
@@ -1089,9 +1424,16 @@ public class GridAd
             return;
         }
 
-        var destroyMethod = customGridAd.GetType().GetMethod("Destroy");
-        destroyMethod?.Invoke(customGridAd, null);
+        WXCustomAd ad = customGridAd;
         customGridAd = null;
+        var destroyMethod = ad.GetType().GetMethod("Destroy");
+        destroyMethod?.Invoke(ad, null);
+    }
+
+    void ClearAd()
+    {
+        Destroy();
+        clearAd?.Invoke(gridData?.NameId, this);
     }
 }
 #endif

@@ -62,6 +62,9 @@ public class AdeConsoleWindow : EditorWindow
     readonly List<GridAdDraft> gridAdDrafts = new();
     readonly MoreGamesDraft moreGamesDraft = new();
     readonly List<MoreGamesQueryDraft> moreGamesQueryDrafts = new();
+    readonly GameClubDraft gameClubDraft = new();
+    readonly AdShieldDraft adShieldDraft = new();
+    readonly AutoInterstitialDraft autoInterstitialDraft = new();
     readonly List<string> editableCustomSymbols = new();
     readonly ListSelectionState customSymbolSelection = new();
     readonly ListSelectionState subscribeTemplateSelection = new();
@@ -479,6 +482,13 @@ public class AdeConsoleWindow : EditorWindow
 
         UnityEngine.Object adeDataInfo = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AdeDataInfoPath);
         UnityEngine.Object adsData = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AdsDataPath);
+        string platformSymbol = GetSelectedPlatformSymbol();
+
+        if (adsData != null)
+        {
+            DrawAdShieldDraftFields();
+            EditorGUILayout.Space(4f);
+        }
 
         float columnWidth = Mathf.Max(320f, (position.width - 54f) * 0.5f);
         using (new EditorGUILayout.HorizontalScope())
@@ -494,7 +504,7 @@ public class AdeConsoleWindow : EditorWindow
 
                 if (adsData != null)
                 {
-                    DrawRewardOnlyEditor();
+                    DrawRewardOnlyEditor(platformSymbol);
                 }
             }
 
@@ -511,7 +521,7 @@ public class AdeConsoleWindow : EditorWindow
 
                 if (adeDataInfo != null)
                 {
-                    DrawRewardAdeDataInfoEditor();
+                    DrawRewardAdeDataInfoEditor(platformSymbol);
                 }
             }
         }
@@ -530,17 +540,33 @@ public class AdeConsoleWindow : EditorWindow
         EndSectionCard();
     }
 
-    void DrawRewardAdeDataInfoEditor()
+    void DrawRewardAdeDataInfoEditor(string platformSymbol)
     {
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("内容参数", EditorStyles.miniBoldLabel);
             DrawCompactContentIdField("分享ID", rewardShareIdDraft, value => rewardShareIdDraft = value, 44f);
-            subscribeTemplateList.DoLayoutList();
 
-            EditorGUILayout.Space(2f);
-            feedRepeatContentList.DoLayoutList();
-            feedAcquisitionContentList.DoLayoutList();
+            if (IsDouyinPlatform(platformSymbol) || IsWeChatPlatform(platformSymbol))
+            {
+                EditorGUILayout.Space(2f);
+                subscribeTemplateList.DoLayoutList();
+            }
+
+            if (IsDouyinPlatform(platformSymbol))
+            {
+                EditorGUILayout.Space(2f);
+                feedRepeatContentList.DoLayoutList();
+                feedAcquisitionContentList.DoLayoutList();
+                EditorGUILayout.Space(2f);
+                DrawMoreGamesDraftFields();
+            }
+
+            if (IsWeChatPlatform(platformSymbol))
+            {
+                EditorGUILayout.Space(2f);
+                DrawGameClubDraftFields();
+            }
         }
     }
 
@@ -963,7 +989,7 @@ public class AdeConsoleWindow : EditorWindow
         return templates;
     }
 
-    void DrawAdeDataInfoEditor(UnityEngine.Object adeDataInfo)
+    void DrawAdeDataInfoEditor(UnityEngine.Object adeDataInfo, string platformSymbol)
     {
         EnsureAdeDataInfoFeedFields(adeDataInfo);
 
@@ -975,9 +1001,30 @@ public class AdeConsoleWindow : EditorWindow
             EditorGUILayout.LabelField("内容配置", EditorStyles.miniBoldLabel);
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(serializedObject.FindProperty("ShareId"), new GUIContent("ShareId"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("SubscribeTmplIds"), new GUIContent("订阅模板"), true);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedRepeatContentIDs"), new GUIContent("复访流内容"), true);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedAcquisitionContentIDs"), new GUIContent("获客流内容"), true);
+            if (IsDouyinPlatform(platformSymbol) || IsWeChatPlatform(platformSymbol))
+            {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("SubscribeTmplIds"), new GUIContent("订阅模板"), true);
+            }
+
+            if (IsDouyinPlatform(platformSymbol))
+            {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedRepeatContentIDs"), new GUIContent("复访流内容"), true);
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedAcquisitionContentIDs"), new GUIContent("获客流内容"), true);
+                SerializedProperty moreGamesProperty = serializedObject.FindProperty("MoreGames");
+                if (moreGamesProperty != null)
+                {
+                    EditorGUILayout.PropertyField(moreGamesProperty, new GUIContent("更多游戏"), true);
+                }
+            }
+
+            if (IsWeChatPlatform(platformSymbol))
+            {
+                SerializedProperty gameClubProperty = serializedObject.FindProperty("GameClub");
+                if (gameClubProperty != null)
+                {
+                    EditorGUILayout.PropertyField(gameClubProperty, new GUIContent("游戏圈"), true);
+                }
+            }
             if (EditorGUI.EndChangeCheck())
             {
                 SaveSerializedChanges(serializedObject, adeDataInfo);
@@ -985,7 +1032,7 @@ public class AdeConsoleWindow : EditorWindow
         }
     }
 
-    void DrawAdsDataEditor(UnityEngine.Object adsData)
+    void DrawAdsDataEditor(UnityEngine.Object adsData, string platformSymbol)
     {
         EnsureAdsDataStructure(adsData);
 
@@ -1001,15 +1048,9 @@ public class AdeConsoleWindow : EditorWindow
             EditorGUILayout.PropertyField(adDataProperty.FindPropertyRelative("BannerID"), new GUIContent("Banner 广告"), true);
             EditorGUILayout.PropertyField(adDataProperty.FindPropertyRelative("RewardID"), new GUIContent("激励广告"), true);
             SerializedProperty gridAdProperty = adDataProperty.FindPropertyRelative("GridAdList");
-            if (gridAdProperty != null)
+            if (IsWeChatPlatform(platformSymbol) && gridAdProperty != null)
             {
                 EditorGUILayout.PropertyField(gridAdProperty, new GUIContent("格子广告"), true);
-            }
-
-            SerializedProperty moreGamesProperty = adDataProperty.FindPropertyRelative("MoreGames");
-            if (moreGamesProperty != null)
-            {
-                EditorGUILayout.PropertyField(moreGamesProperty, new GUIContent("更多游戏"), true);
             }
 
             if (EditorGUI.EndChangeCheck())
@@ -1019,19 +1060,22 @@ public class AdeConsoleWindow : EditorWindow
         }
     }
 
-    void DrawRewardOnlyEditor()
+    void DrawRewardOnlyEditor(string platformSymbol)
     {
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             EditorGUILayout.LabelField("广告参数", EditorStyles.miniBoldLabel);
             DrawAdItemDraftFields("插屏参数", interstitialAdDraft);
+            DrawAutoInterstitialDraftFields();
             DrawAdItemDraftFields("Banner 参数", bannerAdDraft);
             EditorGUILayout.Space(2f);
             rewardAdList.DoLayoutList();
-            EditorGUILayout.Space(2f);
-            gridAdList.DoLayoutList();
-            EditorGUILayout.Space(2f);
-            DrawMoreGamesDraftFields();
+
+            if (IsWeChatPlatform(platformSymbol))
+            {
+                EditorGUILayout.Space(2f);
+                gridAdList.DoLayoutList();
+            }
         }
     }
 
@@ -1049,6 +1093,79 @@ public class AdeConsoleWindow : EditorWindow
         if (DrawCompactAdItemFields(fieldRect, draft))
         {
             rewardConfigDirty = true;
+        }
+    }
+
+    void DrawAutoInterstitialDraftFields()
+    {
+        Rect rowRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 2f);
+        rowRect.y += 1f;
+        rowRect.height = EditorGUIUtility.singleLineHeight;
+
+        float titleWidth = Mathf.Min(78f, rowRect.width * 0.24f);
+        Rect titleRect = new Rect(rowRect.x + 2f, rowRect.y, titleWidth, rowRect.height);
+        Rect fieldRect = new Rect(titleRect.xMax + 6f, rowRect.y, rowRect.xMax - titleRect.xMax - 8f, rowRect.height);
+
+        EditorGUI.LabelField(titleRect, "自弹插屏", EditorStyles.miniBoldLabel);
+        if (DrawCompactAutoInterstitialFields(fieldRect))
+        {
+            rewardConfigDirty = true;
+        }
+    }
+
+    void DrawAdShieldDraftFields()
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            Rect rowRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 2f);
+            rowRect.y += 1f;
+            rowRect.height = EditorGUIUtility.singleLineHeight;
+
+            float gap = 8f;
+            float titleWidth = 64f;
+            float timeToggleWidth = 98f;
+            float areaToggleWidth = 98f;
+            Rect titleRect = new Rect(rowRect.x + 2f, rowRect.y, titleWidth, rowRect.height);
+            Rect timeToggleRect = new Rect(titleRect.xMax + gap, rowRect.y, timeToggleWidth, rowRect.height);
+            Rect areaToggleRect = new Rect(rowRect.xMax - areaToggleWidth - 2f, rowRect.y, areaToggleWidth, rowRect.height);
+            float timeWidth = Mathf.Max(0f, areaToggleRect.x - timeToggleRect.xMax - gap);
+            Rect timeRect = new Rect(timeToggleRect.xMax + gap, rowRect.y, timeWidth, rowRect.height);
+
+            EditorGUI.LabelField(titleRect, "广告屏蔽", EditorStyles.miniBoldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            adShieldDraft.EnableTimeShield = EditorGUI.ToggleLeft(timeToggleRect, "时间屏蔽", adShieldDraft.EnableTimeShield);
+            using (new EditorGUI.DisabledScope(!adShieldDraft.EnableTimeShield))
+            {
+                DrawAdShieldTimeFields(timeRect);
+            }
+
+            adShieldDraft.EnableAreaShield = EditorGUI.ToggleLeft(areaToggleRect, "地区屏蔽", adShieldDraft.EnableAreaShield);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                rewardConfigDirty = true;
+            }
+        }
+    }
+
+    void DrawAdShieldTimeFields(Rect rowRect)
+    {
+        float gap = 6f;
+        float usableWidth = Mathf.Max(0f, rowRect.width - gap);
+        Rect startRect = new Rect(rowRect.x, rowRect.y, Mathf.Floor(usableWidth * 0.5f), rowRect.height);
+        Rect endRect = new Rect(startRect.xMax + gap, rowRect.y, rowRect.xMax - startRect.xMax - gap, rowRect.height);
+
+        float previousLabelWidth = EditorGUIUtility.labelWidth;
+        try
+        {
+            EditorGUIUtility.labelWidth = 24f;
+            adShieldDraft.ShieldStartTime = EditorGUI.TextField(startRect, "始", adShieldDraft.ShieldStartTime);
+            adShieldDraft.ShieldEndTime = EditorGUI.TextField(endRect, "止", adShieldDraft.ShieldEndTime);
+        }
+        finally
+        {
+            EditorGUIUtility.labelWidth = previousLabelWidth;
         }
     }
 
@@ -1078,6 +1195,22 @@ public class AdeConsoleWindow : EditorWindow
             }
 
             moreGamesQueryList.DoLayoutList();
+        }
+    }
+
+    void DrawGameClubDraftFields()
+    {
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            EditorGUILayout.LabelField("游戏圈参数", EditorStyles.miniBoldLabel);
+
+            Rect rowRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 2f);
+            rowRect.y += 1f;
+            rowRect.height = EditorGUIUtility.singleLineHeight;
+            if (DrawCompactGameClubFields(rowRect, gameClubDraft))
+            {
+                rewardConfigDirty = true;
+            }
         }
     }
 
@@ -1358,6 +1491,7 @@ public class AdeConsoleWindow : EditorWindow
             {
                 NameId = string.Empty,
                 Type = GridAdType.Horizontal,
+                Width = GetDefaultGridAdWidth(GridAdType.Horizontal),
                 Anchor = GridAnchorType.Bottom,
                 Position = Vector2.zero,
                 AdUnitId = string.Empty
@@ -1471,6 +1605,43 @@ public class AdeConsoleWindow : EditorWindow
         return changed;
     }
 
+    bool DrawCompactAutoInterstitialFields(Rect fieldRect)
+    {
+        float gap = 6f;
+        float toggleWidth = Mathf.Min(118f, fieldRect.width * 0.42f);
+        Rect toggleRect = new Rect(fieldRect.x, fieldRect.y, toggleWidth, fieldRect.height);
+        Rect intervalRect = new Rect(toggleRect.xMax + gap, fieldRect.y, fieldRect.xMax - toggleRect.xMax - gap, fieldRect.height);
+
+        bool changed = false;
+        float previousLabelWidth = EditorGUIUtility.labelWidth;
+        try
+        {
+            bool newEnable = EditorGUI.ToggleLeft(toggleRect, "启用", autoInterstitialDraft.EnableAutoInterstitial);
+            if (newEnable != autoInterstitialDraft.EnableAutoInterstitial)
+            {
+                autoInterstitialDraft.EnableAutoInterstitial = newEnable;
+                changed = true;
+            }
+
+            using (new EditorGUI.DisabledScope(!autoInterstitialDraft.EnableAutoInterstitial))
+            {
+                EditorGUIUtility.labelWidth = 36f;
+                float newInterval = Mathf.Max(1f, EditorGUI.FloatField(intervalRect, "间隔", autoInterstitialDraft.IntervalSeconds));
+                if (!Mathf.Approximately(newInterval, autoInterstitialDraft.IntervalSeconds))
+                {
+                    autoInterstitialDraft.IntervalSeconds = newInterval;
+                    changed = true;
+                }
+            }
+        }
+        finally
+        {
+            EditorGUIUtility.labelWidth = previousLabelWidth;
+        }
+
+        return changed;
+    }
+
     bool DrawCompactGridAdFields(Rect fieldRect, GridAdDraft item)
     {
         float lineHeight = EditorGUIUtility.singleLineHeight;
@@ -1478,12 +1649,14 @@ public class AdeConsoleWindow : EditorWindow
         Rect firstRow = new Rect(fieldRect.x, fieldRect.y, fieldRect.width, lineHeight);
         Rect secondRow = new Rect(fieldRect.x, firstRow.yMax + 4f, fieldRect.width, lineHeight);
 
-        float firstUsableWidth = firstRow.width - gap * 2f;
-        float nameWidth = Mathf.Floor(firstUsableWidth * 0.38f);
-        float typeWidth = Mathf.Floor(firstUsableWidth * 0.29f);
+        float firstUsableWidth = firstRow.width - gap * 3f;
+        float nameWidth = Mathf.Floor(firstUsableWidth * 0.30f);
+        float typeWidth = Mathf.Floor(firstUsableWidth * 0.23f);
+        float widthWidth = Mathf.Floor(firstUsableWidth * 0.18f);
         Rect nameRect = new Rect(firstRow.x, firstRow.y, nameWidth, lineHeight);
         Rect typeRect = new Rect(nameRect.xMax + gap, firstRow.y, typeWidth, lineHeight);
-        Rect anchorRect = new Rect(typeRect.xMax + gap, firstRow.y, firstRow.xMax - typeRect.xMax - gap, lineHeight);
+        Rect widthRect = new Rect(typeRect.xMax + gap, firstRow.y, widthWidth, lineHeight);
+        Rect anchorRect = new Rect(widthRect.xMax + gap, firstRow.y, firstRow.xMax - widthRect.xMax - gap, lineHeight);
 
         float secondUsableWidth = secondRow.width - gap;
         float idWidth = Mathf.Floor(secondUsableWidth * 0.48f);
@@ -1506,7 +1679,20 @@ public class AdeConsoleWindow : EditorWindow
             GridAdType newType = (GridAdType)EditorGUI.EnumPopup(typeRect, "类型", item.Type);
             if (newType != item.Type)
             {
+                float oldDefaultWidth = GetDefaultGridAdWidth(item.Type);
+                if (item.Width <= 0f || Mathf.Approximately(item.Width, oldDefaultWidth))
+                {
+                    item.Width = GetDefaultGridAdWidth(newType);
+                }
+
                 item.Type = newType;
+                changed = true;
+            }
+
+            float newWidth = Mathf.Max(0f, EditorGUI.FloatField(widthRect, "宽度", item.Width));
+            if (!Mathf.Approximately(newWidth, item.Width))
+            {
+                item.Width = newWidth;
                 changed = true;
             }
 
@@ -1538,6 +1724,11 @@ public class AdeConsoleWindow : EditorWindow
         }
 
         return changed;
+    }
+
+    float GetDefaultGridAdWidth(GridAdType type)
+    {
+        return GridAdLayoutUtility.GetTemplateSize(type).x;
     }
 
     bool DrawCompactMoreGamesFields(Rect fieldRect, MoreGamesDraft item)
@@ -1645,6 +1836,28 @@ public class AdeConsoleWindow : EditorWindow
             if (newQuery != item.Query)
             {
                 item.Query = newQuery;
+                changed = true;
+            }
+        }
+        finally
+        {
+            EditorGUIUtility.labelWidth = previousLabelWidth;
+        }
+
+        return changed;
+    }
+
+    bool DrawCompactGameClubFields(Rect fieldRect, GameClubDraft item)
+    {
+        bool changed = false;
+        float previousLabelWidth = EditorGUIUtility.labelWidth;
+        try
+        {
+            EditorGUIUtility.labelWidth = 92f;
+            string newOpenLink = EditorGUI.TextField(fieldRect, "OpenLink", item.OpenLink);
+            if (newOpenLink != item.OpenLink)
+            {
+                item.OpenLink = newOpenLink;
                 changed = true;
             }
         }
@@ -2217,6 +2430,21 @@ public class AdeConsoleWindow : EditorWindow
         return string.IsNullOrEmpty(customSymbol) ? "未识别" : customSymbol;
     }
 
+    string GetSelectedPlatformSymbol()
+    {
+        return editableCustomSymbols.FirstOrDefault(IsPlatformLikeSymbol) ?? string.Empty;
+    }
+
+    bool IsDouyinPlatform(string platformSymbol)
+    {
+        return string.Equals(platformSymbol, "Ade_TT", StringComparison.Ordinal);
+    }
+
+    bool IsWeChatPlatform(string platformSymbol)
+    {
+        return string.Equals(platformSymbol, "Ade_WX", StringComparison.Ordinal);
+    }
+
     bool IsCurrentPreset(List<string> symbols, string symbol)
     {
         string currentSymbol = symbols.FirstOrDefault(IsPlatformLikeSymbol);
@@ -2391,6 +2619,8 @@ public class AdeConsoleWindow : EditorWindow
     void LoadRewardConfigDrafts()
     {
         UnityEngine.Object adeDataInfo = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AdeDataInfoPath);
+        bool loadedMoreGamesFromAdeDataInfo = false;
+        bool loadedGameClubFromAdeDataInfo = false;
         if (adeDataInfo != null)
         {
             EnsureAdeDataInfoFeedFields(adeDataInfo);
@@ -2404,6 +2634,20 @@ public class AdeConsoleWindow : EditorWindow
 
             feedAcquisitionContentDrafts.Clear();
             feedAcquisitionContentDrafts.AddRange(GetOrCreateStringListField(adeDataInfo, "FeedAcquisitionContentIDs"));
+
+            object moreGamesValue = GetFieldValue(adeDataInfo, "MoreGames");
+            if (moreGamesValue != null)
+            {
+                LoadMoreGamesDraft(moreGamesValue);
+                loadedMoreGamesFromAdeDataInfo = true;
+            }
+
+            object gameClubValue = GetFieldValue(adeDataInfo, "GameClub");
+            if (gameClubValue != null)
+            {
+                LoadGameClubDraft(gameClubValue);
+                loadedGameClubFromAdeDataInfo = true;
+            }
         }
 
         UnityEngine.Object adsData = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AdsDataPath);
@@ -2430,7 +2674,18 @@ public class AdeConsoleWindow : EditorWindow
                 gridAdDrafts.Add(draft);
             }
 
-            LoadMoreGamesDraft(GetFieldValue(adDataValue, "MoreGames"));
+            LoadAdShieldDraft(GetFieldValue(adDataValue, "AdShield"));
+            LoadAutoInterstitialDraft(GetFieldValue(adDataValue, "AutoInterstitial"));
+
+            if (!loadedMoreGamesFromAdeDataInfo)
+            {
+                LoadMoreGamesDraft(GetFieldValue(adDataValue, "MoreGames"));
+            }
+
+            if (!loadedGameClubFromAdeDataInfo)
+            {
+                LoadGameClubDraft(GetFieldValue(adDataValue, "GameClub"));
+            }
         }
 
         rewardConfigDirty = false;
@@ -2456,6 +2711,8 @@ public class AdeConsoleWindow : EditorWindow
             SetFieldValue(adeDataInfo, "FeedRepeatContentID", repeatContentIds.Count > 0 ? repeatContentIds[0] : string.Empty);
             SetFieldValue(adeDataInfo, "SubscribeTmplIds", GetNormalizedStringDrafts(subscribeTemplateDrafts));
             SetFieldValue(adeDataInfo, "FeedContentIDs", new List<string>(acquisitionContentIds));
+            SaveMoreGamesDraft(GetFieldValue(adeDataInfo, "MoreGames"));
+            SaveGameClubDraft(GetFieldValue(adeDataInfo, "GameClub"));
             SaveReflectedAssetChanges(adeDataInfo);
         }
 
@@ -2469,7 +2726,8 @@ public class AdeConsoleWindow : EditorWindow
             SaveAdItemDraft(bannerAdDraft, GetFieldValue(adDataValue, "BannerID"));
             SetRewardItemsFromDrafts(adDataValue, rewardAdDrafts);
             SetGridAdItemsFromDrafts(adDataValue, gridAdDrafts);
-            SaveMoreGamesDraft(GetFieldValue(adDataValue, "MoreGames"));
+            SaveAdShieldDraft(GetFieldValue(adDataValue, "AdShield"));
+            SaveAutoInterstitialDraft(GetFieldValue(adDataValue, "AutoInterstitial"));
             SaveReflectedAssetChanges(adsData);
         }
 
@@ -2504,6 +2762,7 @@ public class AdeConsoleWindow : EditorWindow
         {
             draft.NameId = string.Empty;
             draft.Type = GridAdType.Horizontal;
+            draft.Width = GetDefaultGridAdWidth(draft.Type);
             draft.Anchor = GridAnchorType.Bottom;
             draft.Position = Vector2.zero;
             draft.AdUnitId = string.Empty;
@@ -2514,6 +2773,9 @@ public class AdeConsoleWindow : EditorWindow
 
         object typeValue = GetFieldValue(item, "Type");
         draft.Type = typeValue is GridAdType type ? type : GridAdType.Horizontal;
+
+        object widthValue = GetFieldValue(item, "Width");
+        draft.Width = widthValue is float width && width > 0f ? width : GetDefaultGridAdWidth(draft.Type);
 
         draft.AdUnitId = GetStringFieldValue(item, "AdUnitId");
 
@@ -2581,6 +2843,7 @@ public class AdeConsoleWindow : EditorWindow
             object gridItem = Activator.CreateInstance(gridAdType);
             SetFieldValue(gridItem, "NameId", draft.NameId ?? string.Empty);
             SetFieldValue(gridItem, "Type", draft.Type);
+            SetFieldValue(gridItem, "Width", draft.Width);
             SetFieldValue(gridItem, "AdUnitId", draft.AdUnitId ?? string.Empty);
             SetFieldValue(gridItem, "Anchor", draft.Anchor);
             SetFieldValue(gridItem, "Position", draft.Position);
@@ -2588,6 +2851,87 @@ public class AdeConsoleWindow : EditorWindow
         }
 
         gridField.SetValue(adDataValue, gridList);
+    }
+
+    void LoadAdShieldDraft(object shieldValue)
+    {
+        if (shieldValue == null)
+        {
+            ResetAdShieldDraft();
+            return;
+        }
+
+        object enableTimeValue = GetFieldValue(shieldValue, "EnableTimeShield");
+        adShieldDraft.EnableTimeShield = enableTimeValue is bool enableTime && enableTime;
+        adShieldDraft.ShieldStartTime = GetStringFieldValue(shieldValue, "ShieldStartTime");
+        adShieldDraft.ShieldEndTime = GetStringFieldValue(shieldValue, "ShieldEndTime");
+        if (string.IsNullOrWhiteSpace(adShieldDraft.ShieldStartTime))
+        {
+            adShieldDraft.ShieldStartTime = new AdShieldData().ShieldStartTime;
+        }
+
+        if (string.IsNullOrWhiteSpace(adShieldDraft.ShieldEndTime))
+        {
+            adShieldDraft.ShieldEndTime = new AdShieldData().ShieldEndTime;
+        }
+
+        object enableAreaValue = GetFieldValue(shieldValue, "EnableAreaShield");
+        adShieldDraft.EnableAreaShield = enableAreaValue is bool enableArea && enableArea;
+    }
+
+    void ResetAdShieldDraft()
+    {
+        AdShieldData defaults = new AdShieldData();
+        adShieldDraft.EnableTimeShield = defaults.EnableTimeShield;
+        adShieldDraft.ShieldStartTime = defaults.ShieldStartTime;
+        adShieldDraft.ShieldEndTime = defaults.ShieldEndTime;
+        adShieldDraft.EnableAreaShield = defaults.EnableAreaShield;
+    }
+
+    void SaveAdShieldDraft(object shieldValue)
+    {
+        if (shieldValue == null)
+        {
+            return;
+        }
+
+        SetFieldValue(shieldValue, "EnableTimeShield", adShieldDraft.EnableTimeShield);
+        SetFieldValue(shieldValue, "ShieldStartTime", adShieldDraft.ShieldStartTime ?? string.Empty);
+        SetFieldValue(shieldValue, "ShieldEndTime", adShieldDraft.ShieldEndTime ?? string.Empty);
+        SetFieldValue(shieldValue, "EnableAreaShield", adShieldDraft.EnableAreaShield);
+    }
+
+    void LoadAutoInterstitialDraft(object autoValue)
+    {
+        if (autoValue == null)
+        {
+            ResetAutoInterstitialDraft();
+            return;
+        }
+
+        object enableValue = GetFieldValue(autoValue, "EnableAutoInterstitial");
+        autoInterstitialDraft.EnableAutoInterstitial = enableValue is bool enable && enable;
+
+        object intervalValue = GetFieldValue(autoValue, "IntervalSeconds");
+        autoInterstitialDraft.IntervalSeconds = intervalValue is float interval && interval > 0f ? interval : 30f;
+    }
+
+    void ResetAutoInterstitialDraft()
+    {
+        AutoInterstitialData defaults = new AutoInterstitialData();
+        autoInterstitialDraft.EnableAutoInterstitial = defaults.EnableAutoInterstitial;
+        autoInterstitialDraft.IntervalSeconds = defaults.IntervalSeconds;
+    }
+
+    void SaveAutoInterstitialDraft(object autoValue)
+    {
+        if (autoValue == null)
+        {
+            return;
+        }
+
+        SetFieldValue(autoValue, "EnableAutoInterstitial", autoInterstitialDraft.EnableAutoInterstitial);
+        SetFieldValue(autoValue, "IntervalSeconds", Mathf.Max(1f, autoInterstitialDraft.IntervalSeconds));
     }
 
     void LoadMoreGamesDraft(object moreGamesValue)
@@ -2642,6 +2986,21 @@ public class AdeConsoleWindow : EditorWindow
         SetFieldValue(moreGamesValue, "Top", moreGamesDraft.Top);
         SetFieldValue(moreGamesValue, "Left", moreGamesDraft.Left);
         SetMoreGamesQueryItemsFromDrafts(moreGamesValue, moreGamesQueryDrafts);
+    }
+
+    void LoadGameClubDraft(object gameClubValue)
+    {
+        gameClubDraft.OpenLink = GetStringFieldValue(gameClubValue, "OpenLink");
+    }
+
+    void SaveGameClubDraft(object gameClubValue)
+    {
+        if (gameClubValue == null)
+        {
+            return;
+        }
+
+        SetFieldValue(gameClubValue, "OpenLink", gameClubDraft.OpenLink ?? string.Empty);
     }
 
     void SetMoreGamesQueryItemsFromDrafts(object moreGamesValue, List<MoreGamesQueryDraft> drafts)
@@ -2906,6 +3265,27 @@ public class AdeConsoleWindow : EditorWindow
         EnsureListField(adeDataInfo, "FeedRepeatContentIDs");
         EnsureListField(adeDataInfo, "FeedAcquisitionContentIDs");
 
+        Type moreGamesDataType = FindType("MoreGamesData");
+        if (moreGamesDataType != null)
+        {
+            EnsureNestedObjectField(adeDataInfo, "MoreGames", moreGamesDataType, adeDataInfo);
+            object moreGamesValue = GetFieldValue(adeDataInfo, "MoreGames");
+            var queryField = moreGamesDataType.GetField("Queries");
+            Type moreGamesQueryDataType = FindType("MoreGamesQueryData");
+            if (moreGamesValue != null && queryField != null && queryField.GetValue(moreGamesValue) == null && moreGamesQueryDataType != null)
+            {
+                Type listType = typeof(List<>).MakeGenericType(moreGamesQueryDataType);
+                queryField.SetValue(moreGamesValue, Activator.CreateInstance(listType));
+                EditorUtility.SetDirty(adeDataInfo);
+            }
+        }
+
+        Type gameClubDataType = FindType("GameClubData");
+        if (gameClubDataType != null)
+        {
+            EnsureNestedObjectField(adeDataInfo, "GameClub", gameClubDataType, adeDataInfo);
+        }
+
         List<string> repeatIds = GetOrCreateStringListField(adeDataInfo, "FeedRepeatContentIDs");
         string legacyRepeatId = GetStringFieldValue(adeDataInfo, "FeedRepeatContentID");
         bool changed = AddUniqueStringValue(repeatIds, legacyRepeatId);
@@ -2962,6 +3342,9 @@ public class AdeConsoleWindow : EditorWindow
         Type gridAdDataType = FindType("GridAdData");
         Type moreGamesDataType = FindType("MoreGamesData");
         Type moreGamesQueryDataType = FindType("MoreGamesQueryData");
+        Type gameClubDataType = FindType("GameClubData");
+        Type adShieldDataType = FindType("AdShieldData");
+        Type autoInterstitialDataType = FindType("AutoInterstitialData");
         if (adsPlatformDataType == null || adItemDataType == null)
         {
             return;
@@ -3005,6 +3388,21 @@ public class AdeConsoleWindow : EditorWindow
                 EditorUtility.SetDirty(adsData);
             }
         }
+
+        if (gameClubDataType != null)
+        {
+            EnsureNestedObjectField(adDataValue, "GameClub", gameClubDataType, adsData);
+        }
+
+        if (adShieldDataType != null)
+        {
+            EnsureNestedObjectField(adDataValue, "AdShield", adShieldDataType, adsData);
+        }
+
+        if (autoInterstitialDataType != null)
+        {
+            EnsureNestedObjectField(adDataValue, "AutoInterstitial", autoInterstitialDataType, adsData);
+        }
     }
 
     void EnsureNestedObjectField(object target, string fieldName, Type fieldType, UnityEngine.Object dirtyAsset)
@@ -3043,6 +3441,7 @@ public class AdeConsoleWindow : EditorWindow
     {
         public string NameId = string.Empty;
         public GridAdType Type = GridAdType.Horizontal;
+        public float Width;
         public string AdUnitId = string.Empty;
         public GridAnchorType Anchor = GridAnchorType.Bottom;
         public Vector2 Position = Vector2.zero;
@@ -3061,6 +3460,25 @@ public class AdeConsoleWindow : EditorWindow
     {
         public string AppId = string.Empty;
         public string Query = string.Empty;
+    }
+
+    class GameClubDraft
+    {
+        public string OpenLink = string.Empty;
+    }
+
+    class AdShieldDraft
+    {
+        public bool EnableTimeShield;
+        public string ShieldStartTime = "2025-05-01 00:00:00";
+        public string ShieldEndTime = "2025-05-01 19:00:00";
+        public bool EnableAreaShield;
+    }
+
+    class AutoInterstitialDraft
+    {
+        public bool EnableAutoInterstitial;
+        public float IntervalSeconds = 30f;
     }
 
     class ListSelectionState

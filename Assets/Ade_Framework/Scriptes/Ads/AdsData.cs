@@ -60,6 +60,9 @@ public class GridAdData
     [InspectorName("格子类型")]
     public GridAdType Type;
 
+    [InspectorName("原生广告宽度")]
+    public float Width;
+
     [InspectorName("格子广告ID")]
     public string AdUnitId;
 
@@ -125,6 +128,39 @@ public class MoreGamesData
 }
 
 [System.Serializable]
+public class GameClubData
+{
+    [InspectorName("OpenLink")]
+    public string OpenLink;
+}
+
+[System.Serializable]
+public class AdShieldData
+{
+    [InspectorName("启用时间屏蔽")]
+    public bool EnableTimeShield;
+
+    [InspectorName("屏蔽开始时间")]
+    public string ShieldStartTime = "2025-05-01 00:00:00";
+
+    [InspectorName("屏蔽结束时间")]
+    public string ShieldEndTime = "2025-05-01 19:00:00";
+
+    [InspectorName("启用地区屏蔽")]
+    public bool EnableAreaShield;
+}
+
+[System.Serializable]
+public class AutoInterstitialData
+{
+    [InspectorName("启用自弹插屏")]
+    public bool EnableAutoInterstitial;
+
+    [InspectorName("自弹间隔秒数")]
+    public float IntervalSeconds = 30f;
+}
+
+[System.Serializable]
 public class AdsPlatformData
 {
     public string ID;
@@ -133,6 +169,14 @@ public class AdsPlatformData
     public AdItemData[] RewardID;
     [InspectorName("格子广告列表")]
     public List<GridAdData> GridAdList = new List<GridAdData>();
+    [HideInInspector]
     [InspectorName("更多游戏")]
     public MoreGamesData MoreGames = new MoreGamesData();
+    [HideInInspector]
+    [InspectorName("游戏圈")]
+    public GameClubData GameClub = new GameClubData();
+    [InspectorName("广告屏蔽")]
+    public AdShieldData AdShield = new AdShieldData();
+    [InspectorName("自弹插屏")]
+    public AutoInterstitialData AutoInterstitial = new AutoInterstitialData();
 }
