@@ -35,4 +35,9 @@ MonoBehaviour:
       OpenLink: 
     AdShield:
       EnableTimeShield: 0
+      ShieldStartTime: 2025-05-01 00:00:00
+      ShieldEndTime: 2025-05-01 19:00:00
       EnableAreaShield: 0
+    AutoInterstitial:
+      EnableAutoInterstitial: 0
+      IntervalSeconds: 30

@@ -309,7 +309,7 @@ RectTransform:
   m_GameObject: {fileID: 3376400740838645121}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.7359801, y: 0.7359801, z: 0.7359801}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6085179471574081000}
@@ -320,7 +320,7 @@ RectTransform:
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!223 &1486661249947687397
 Canvas:
   m_ObjectHideFlags: 0
@@ -338,6 +338,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_SortingLayerID: 0
   m_SortingOrder: 32767
@@ -1111,9 +1112,13 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3528566445532266370, guid: f2cb7a8e7ece47d6b4862d8b20ae95b7, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 4951465176197375025, guid: f2cb7a8e7ece47d6b4862d8b20ae95b7, type: 3}
       propertyPath: m_Text
-      value: "\u54C8\u57FA\u7C73\u7684\u4E16\u754C"
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 4951465176197375025, guid: f2cb7a8e7ece47d6b4862d8b20ae95b7, type: 3}
       propertyPath: m_FontData.m_FontSize
@@ -1125,7 +1130,7 @@ PrefabInstance:
       objectReference: {fileID: 21300000, guid: d3e60a613882ed74b954d38562949a5b, type: 3}
     - target: {fileID: 8961077081585715538, guid: f2cb7a8e7ece47d6b4862d8b20ae95b7, type: 3}
       propertyPath: m_Text
-      value: "\u70B9\u51FB\u54C8\u57FA\u7C73\u7684\u4E16\u754C"
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 8961077081585715538, guid: f2cb7a8e7ece47d6b4862d8b20ae95b7, type: 3}
       propertyPath: m_FontData.m_Alignment
