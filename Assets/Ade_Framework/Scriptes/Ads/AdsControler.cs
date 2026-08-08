@@ -625,6 +625,18 @@ namespace Ade_Framework
         {
             try
             {
+                openLink = openLink == null ? string.Empty : openLink.Trim();
+                if (string.IsNullOrWhiteSpace(openLink))
+                {
+                    LogManager.LogError("游戏圈OpenLink为空");
+                    return;
+                }
+
+                if (TryOpenWXGameClubByPageManager(openLink))
+                {
+                    return;
+                }
+
                 Type optionType = FindWXType("OpenPageOption");
                 if (optionType == null)
                 {
@@ -649,6 +661,53 @@ namespace Ade_Framework
             catch (Exception exception)
             {
                 LogManager.LogError($"游戏圈打开失败:{exception.Message}");
+            }
+        }
+
+        bool TryOpenWXGameClubByPageManager(string openLink)
+        {
+            try
+            {
+                Type wxType = FindWXType("WX");
+                if (wxType == null)
+                {
+                    return false;
+                }
+
+                System.Reflection.MethodInfo createPageManagerMethod = wxType.GetMethod("CreatePageManager", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (createPageManagerMethod == null)
+                {
+                    return false;
+                }
+
+                object pageManager = createPageManagerMethod.Invoke(null, null);
+                if (pageManager == null)
+                {
+                    return false;
+                }
+
+                Type loadOptionType = FindWXType("LoadOption");
+                Type showOptionType = FindWXType("ShowOption");
+                if (loadOptionType == null || showOptionType == null)
+                {
+                    return false;
+                }
+
+                object loadOption = Activator.CreateInstance(loadOptionType);
+                loadOptionType.GetField("openlink")?.SetValue(loadOption, openLink);
+                pageManager.GetType().GetMethod("Load", new[] { loadOptionType })?.Invoke(pageManager, new[] { loadOption });
+
+                object showOption = Activator.CreateInstance(showOptionType);
+                showOptionType.GetField("openlink")?.SetValue(showOption, openLink);
+                pageManager.GetType().GetMethod("Show", new[] { showOptionType })?.Invoke(pageManager, new[] { showOption });
+
+                LogManager.Log("打开游戏圈(PageManager)", Color.yellow);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                LogManager.LogWarning($"PageManager 打开游戏圈失败:{exception.Message}");
+                return false;
             }
         }
 

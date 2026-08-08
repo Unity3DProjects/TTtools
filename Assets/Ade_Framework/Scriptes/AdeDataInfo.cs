@@ -12,7 +12,11 @@ public class AdeDataInfo : ScriptableObject
     [Tooltip("最多3个")]
     public List<string> SubscribeTmplIds = new List<string>(3);
 
-    [Header("推荐流复访ID")]
+    [Header("推荐流复访 content_id")]
+    public List<FeedRepeatContentData> FeedRepeatContents = new List<FeedRepeatContentData>();
+
+    // Retained for existing assets and migrated by the editor tooling.
+    [HideInInspector]
     public List<string> FeedRepeatContentIDs = new List<string>();
 
     [Header("推荐流获客ID")]
@@ -29,4 +33,24 @@ public class AdeDataInfo : ScriptableObject
 
     [HideInInspector]
     public string FeedRepeatContentID;
+}
+
+[System.Serializable]
+public enum FeedRepeatSceneType
+{
+    [InspectorName("离线收益")]
+    OfflineReward = 1,
+
+    [InspectorName("体力恢复")]
+    EnergyRecovery = 2,
+
+    [InspectorName("重要事件提醒")]
+    ImportantEventReminder = 3
+}
+
+[System.Serializable]
+public class FeedRepeatContentData
+{
+    public string ContentId;
+    public FeedRepeatSceneType SceneType = FeedRepeatSceneType.ImportantEventReminder;
 }

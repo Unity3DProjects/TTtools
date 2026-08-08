@@ -843,6 +843,11 @@ namespace Ade_Framework
         public string CurrentFeedContentId { get; private set; } = string.Empty;
 
         /// <summary>
+        /// 当前复访 content_id 配置的直玩场景。
+        /// </summary>
+        public FeedRepeatSceneType CurrentFeedRepeatSceneType { get; private set; } = FeedRepeatSceneType.ImportantEventReminder;
+
+        /// <summary>
         /// 当前推荐流启动携带的平台渠道
         /// </summary>
         public string CurrentFeedChannel { get; private set; } = string.Empty;
@@ -890,6 +895,7 @@ namespace Ade_Framework
             {
                 isFeedPlay = true;
                 CurrentFeedScene = ResolveFeedSceneType(CurrentFeedChannel, CurrentFeedContentId);
+                CurrentFeedRepeatSceneType = GetFeedRepeatSceneType(CurrentFeedContentId);
 
                 if (CurrentFeedScene == FeedSceneType.FeedDirectPlay)
                 {
@@ -907,6 +913,7 @@ namespace Ade_Framework
             {
                 Debug.Log("正常 启动");
                 CurrentFeedScene = FeedSceneType.None;
+                CurrentFeedRepeatSceneType = FeedRepeatSceneType.ImportantEventReminder;
                 onNone?.Invoke();
             }
 
@@ -985,9 +992,34 @@ namespace Ade_Framework
         List<string> GetFeedRepeatContentIds()
         {
             List<string> result = new List<string>();
+            if (_AdeDataInfo?.FeedRepeatContents != null)
+            {
+                foreach (FeedRepeatContentData item in _AdeDataInfo.FeedRepeatContents)
+                {
+                    AddFeedContentId(result, item?.ContentId);
+                }
+            }
+
             AddFeedContentIds(result, _AdeDataInfo?.FeedRepeatContentIDs);
             AddFeedContentId(result, _AdeDataInfo?.FeedRepeatContentID);
             return result;
+        }
+
+        public FeedRepeatSceneType GetFeedRepeatSceneType(string contentId)
+        {
+            if (!string.IsNullOrWhiteSpace(contentId) && _AdeDataInfo?.FeedRepeatContents != null)
+            {
+                foreach (FeedRepeatContentData item in _AdeDataInfo.FeedRepeatContents)
+                {
+                    if (item != null
+                        && string.Equals(item.ContentId?.Trim(), contentId.Trim(), StringComparison.Ordinal))
+                    {
+                        return item.SceneType;
+                    }
+                }
+            }
+
+            return FeedRepeatSceneType.ImportantEventReminder;
         }
 
         List<string> GetFeedAcquisitionContentIds()
@@ -1187,13 +1219,38 @@ namespace Ade_Framework
         /// </summary>
         public void StoreFeedData() 
         {
-            StoreFeedDataForRepeatIds(3);
+            if (_AdeDataInfo?.FeedRepeatContents != null && _AdeDataInfo.FeedRepeatContents.Count > 0)
+            {
+                bool hasConfiguredContent = false;
+                foreach (FeedRepeatContentData item in _AdeDataInfo.FeedRepeatContents)
+                {
+                    if (item == null || string.IsNullOrWhiteSpace(item.ContentId))
+                    {
+                        continue;
+                    }
+
+                    hasConfiguredContent = true;
+                    StoreFeedDataForContent(item.ContentId, (int)item.SceneType);
+                }
+
+                if (hasConfiguredContent)
+                {
+                    return;
+                }
+            }
+
+            StoreFeedDataForRepeatIds((int)FeedRepeatSceneType.ImportantEventReminder);
 
         }
 
         public void StoreFeedData(string contentId)
         {
-            StoreFeedDataForContent(contentId, 3);
+            StoreFeedDataForContent(contentId, (int)GetFeedRepeatSceneType(contentId));
+        }
+
+        public void StoreFeedData(string contentId, FeedRepeatSceneType sceneType)
+        {
+            StoreFeedDataForContent(contentId, (int)sceneType);
         }
 
         /// <summary>
@@ -1201,12 +1258,12 @@ namespace Ade_Framework
         /// </summary>
         public void StoreFeedDataforVit()
         {
-            StoreFeedDataForRepeatIds(2);
+            StoreFeedDataForRepeatIds((int)FeedRepeatSceneType.EnergyRecovery);
         }
 
         public void StoreFeedDataforVit(string contentId)
         {
-            StoreFeedDataForContent(contentId, 2);
+            StoreFeedDataForContent(contentId, (int)FeedRepeatSceneType.EnergyRecovery);
         }
 
         void StoreFeedDataForRepeatIds(int scene)

@@ -56,7 +56,7 @@ public class AdeConsoleWindow : EditorWindow
     readonly AdItemDraft interstitialAdDraft = new();
     readonly AdItemDraft bannerAdDraft = new();
     readonly List<string> subscribeTemplateDrafts = new();
-    readonly List<string> feedRepeatContentDrafts = new();
+    readonly List<FeedRepeatContentDraft> feedRepeatContentDrafts = new();
     readonly List<string> feedAcquisitionContentDrafts = new();
     readonly List<AdItemDraft> rewardAdDrafts = new();
     readonly List<GridAdDraft> gridAdDrafts = new();
@@ -123,7 +123,7 @@ public class AdeConsoleWindow : EditorWindow
 
         customSymbolList = CreateCustomSymbolListEditor();
         subscribeTemplateList = CreateStringListEditor(subscribeTemplateDrafts, "订阅模板", subscribeTemplateSelection, () => rewardConfigDirty = true);
-        feedRepeatContentList = CreateStringListEditor(feedRepeatContentDrafts, "复访流内容", feedRepeatContentSelection, () => rewardConfigDirty = true);
+        feedRepeatContentList = CreateFeedRepeatContentListEditor(feedRepeatContentDrafts, "复访 content_id", feedRepeatContentSelection);
         feedAcquisitionContentList = CreateStringListEditor(feedAcquisitionContentDrafts, "获客流内容", feedAcquisitionContentSelection, () => rewardConfigDirty = true);
         rewardAdList = CreateAdItemListEditor(rewardAdDrafts, "激励参数", rewardAdSelection);
         gridAdList = CreateGridAdListEditor(gridAdDrafts, "格子广告参数", gridAdSelection);
@@ -1008,7 +1008,7 @@ public class AdeConsoleWindow : EditorWindow
 
             if (IsDouyinPlatform(platformSymbol))
             {
-                EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedRepeatContentIDs"), new GUIContent("复访流内容"), true);
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedRepeatContents"), new GUIContent("复访 content_id"), true);
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("FeedAcquisitionContentIDs"), new GUIContent("获客流内容"), true);
                 SerializedProperty moreGamesProperty = serializedObject.FindProperty("MoreGames");
                 if (moreGamesProperty != null)
@@ -1394,6 +1394,72 @@ public class AdeConsoleWindow : EditorWindow
         {
             selection.SelectSingle(reorderable.index);
             onChanged?.Invoke();
+        };
+        reorderableList.headerHeight = EditorGUIUtility.singleLineHeight + 2f;
+        reorderableList.elementHeight = EditorGUIUtility.singleLineHeight + 2f;
+        reorderableList.footerHeight = 18f;
+        return reorderableList;
+    }
+
+    ReorderableList CreateFeedRepeatContentListEditor(List<FeedRepeatContentDraft> list, string header, ListSelectionState selection)
+    {
+        var reorderableList = new ReorderableList(list, typeof(FeedRepeatContentDraft), true, true, true, true);
+        reorderableList.drawHeaderCallback = rect =>
+        {
+            float sceneWidth = 100f;
+            EditorGUI.LabelField(new Rect(rect.x, rect.y, rect.width - sceneWidth - 6f, rect.height), header, EditorStyles.miniBoldLabel);
+            EditorGUI.LabelField(new Rect(rect.xMax - sceneWidth, rect.y, sceneWidth, rect.height), "复访场景", EditorStyles.miniBoldLabel);
+        };
+        reorderableList.drawElementBackgroundCallback = (rect, index, isActive, isFocused) =>
+        {
+            DrawSelectableRowBackground(rect, selection.IsSelected(index));
+        };
+        reorderableList.drawElementCallback = (rect, index, isActive, isFocused) =>
+        {
+            if (index < 0 || index >= list.Count)
+            {
+                return;
+            }
+
+            Rect selectionRect = GetSelectionRect(rect);
+            DrawSelectionHandle(selectionRect, selection.IsSelected(index));
+            if (HandleSelectionClick(rect, selectionRect, index, selection, reorderableList))
+            {
+                return;
+            }
+
+            Rect fieldRect = GetSingleLineFieldRect(rect);
+            const float sceneWidth = 100f;
+            const float gap = 6f;
+            Rect contentIdRect = new Rect(fieldRect.x, fieldRect.y, fieldRect.width - sceneWidth - gap, fieldRect.height);
+            Rect sceneRect = new Rect(contentIdRect.xMax + gap, fieldRect.y, sceneWidth, fieldRect.height);
+            FeedRepeatContentDraft item = list[index];
+            string contentId = EditorGUI.TextField(contentIdRect, item.ContentId ?? string.Empty);
+            FeedRepeatSceneType sceneType = (FeedRepeatSceneType)EditorGUI.EnumPopup(sceneRect, item.SceneType);
+            if (contentId != item.ContentId || sceneType != item.SceneType)
+            {
+                item.ContentId = contentId;
+                item.SceneType = sceneType;
+                rewardConfigDirty = true;
+            }
+        };
+        reorderableList.onAddCallback = _ =>
+        {
+            list.Add(new FeedRepeatContentDraft());
+            selection.SelectSingle(list.Count - 1);
+            rewardConfigDirty = true;
+        };
+        reorderableList.onRemoveCallback = reorderable =>
+        {
+            if (RemoveSelectedItems(list, reorderable, selection))
+            {
+                rewardConfigDirty = true;
+            }
+        };
+        reorderableList.onReorderCallback = reorderable =>
+        {
+            selection.SelectSingle(reorderable.index);
+            rewardConfigDirty = true;
         };
         reorderableList.headerHeight = EditorGUIUtility.singleLineHeight + 2f;
         reorderableList.elementHeight = EditorGUIUtility.singleLineHeight + 2f;
@@ -2630,7 +2696,20 @@ public class AdeConsoleWindow : EditorWindow
             subscribeTemplateDrafts.AddRange(GetOrCreateStringListField(adeDataInfo, "SubscribeTmplIds"));
 
             feedRepeatContentDrafts.Clear();
-            feedRepeatContentDrafts.AddRange(GetOrCreateStringListField(adeDataInfo, "FeedRepeatContentIDs"));
+            if (adeDataInfo is AdeDataInfo feedData && feedData.FeedRepeatContents != null)
+            {
+                foreach (FeedRepeatContentData item in feedData.FeedRepeatContents)
+                {
+                    if (item != null)
+                    {
+                        feedRepeatContentDrafts.Add(new FeedRepeatContentDraft
+                        {
+                            ContentId = item.ContentId,
+                            SceneType = item.SceneType
+                        });
+                    }
+                }
+            }
 
             feedAcquisitionContentDrafts.Clear();
             feedAcquisitionContentDrafts.AddRange(GetOrCreateStringListField(adeDataInfo, "FeedAcquisitionContentIDs"));
@@ -2703,9 +2782,20 @@ public class AdeConsoleWindow : EditorWindow
         if (adeDataInfo != null)
         {
             Undo.RecordObject(adeDataInfo, "应用 AdeDataInfo 参数");
-            List<string> repeatContentIds = GetNormalizedStringDrafts(feedRepeatContentDrafts);
+            List<FeedRepeatContentData> repeatContents = feedRepeatContentDrafts
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.ContentId))
+                .Select(item => new FeedRepeatContentData
+                {
+                    ContentId = item.ContentId.Trim(),
+                    SceneType = item.SceneType
+                })
+                .GroupBy(item => item.ContentId, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToList();
+            List<string> repeatContentIds = repeatContents.Select(item => item.ContentId).ToList();
             List<string> acquisitionContentIds = GetNormalizedStringDrafts(feedAcquisitionContentDrafts);
             SetFieldValue(adeDataInfo, "ShareId", rewardShareIdDraft ?? string.Empty);
+            SetFieldValue(adeDataInfo, "FeedRepeatContents", repeatContents);
             SetFieldValue(adeDataInfo, "FeedRepeatContentIDs", repeatContentIds);
             SetFieldValue(adeDataInfo, "FeedAcquisitionContentIDs", acquisitionContentIds);
             SetFieldValue(adeDataInfo, "FeedRepeatContentID", repeatContentIds.Count > 0 ? repeatContentIds[0] : string.Empty);
@@ -3265,6 +3355,12 @@ public class AdeConsoleWindow : EditorWindow
         EnsureListField(adeDataInfo, "FeedRepeatContentIDs");
         EnsureListField(adeDataInfo, "FeedAcquisitionContentIDs");
 
+        if (adeDataInfo is AdeDataInfo feedData && feedData.FeedRepeatContents == null)
+        {
+            feedData.FeedRepeatContents = new List<FeedRepeatContentData>();
+            EditorUtility.SetDirty(feedData);
+        }
+
         Type moreGamesDataType = FindType("MoreGamesData");
         if (moreGamesDataType != null)
         {
@@ -3289,6 +3385,25 @@ public class AdeConsoleWindow : EditorWindow
         List<string> repeatIds = GetOrCreateStringListField(adeDataInfo, "FeedRepeatContentIDs");
         string legacyRepeatId = GetStringFieldValue(adeDataInfo, "FeedRepeatContentID");
         bool changed = AddUniqueStringValue(repeatIds, legacyRepeatId);
+
+        if (adeDataInfo is AdeDataInfo typedFeedData)
+        {
+            foreach (string contentId in repeatIds)
+            {
+                if (string.IsNullOrWhiteSpace(contentId)
+                    || typedFeedData.FeedRepeatContents.Any(item => item != null && string.Equals(item.ContentId?.Trim(), contentId.Trim(), StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                typedFeedData.FeedRepeatContents.Add(new FeedRepeatContentData
+                {
+                    ContentId = contentId.Trim(),
+                    SceneType = FeedRepeatSceneType.ImportantEventReminder
+                });
+                changed = true;
+            }
+        }
 
         List<string> acquisitionIds = GetOrCreateStringListField(adeDataInfo, "FeedAcquisitionContentIDs");
         foreach (string legacyContentId in GetOrCreateStringListField(adeDataInfo, "FeedContentIDs"))
@@ -3435,6 +3550,12 @@ public class AdeConsoleWindow : EditorWindow
     {
         public string Name = string.Empty;
         public string Id = string.Empty;
+    }
+
+    class FeedRepeatContentDraft
+    {
+        public string ContentId = string.Empty;
+        public FeedRepeatSceneType SceneType = FeedRepeatSceneType.ImportantEventReminder;
     }
 
     class GridAdDraft

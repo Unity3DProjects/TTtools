@@ -14,8 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShareId: 
   SubscribeTmplIds: []
-  FeedRepeatContentIDs: []
-  FeedAcquisitionContentIDs: []
+  FeedRepeatContents:
+  - ContentId: CONTENT14155942914
+    SceneType: 3
+  FeedRepeatContentIDs:
+  - CONTENT14155942914
+  FeedAcquisitionContentIDs:
+  - CONTENT14055639810
   MoreGames:
     GridCount: 2
     Size: 1
@@ -25,5 +30,6 @@ MonoBehaviour:
     Queries: []
   GameClub:
     OpenLink: 
-  FeedContentIDs: []
-  FeedRepeatContentID: 
+  FeedContentIDs:
+  - CONTENT14055639810
+  FeedRepeatContentID: CONTENT14155942914

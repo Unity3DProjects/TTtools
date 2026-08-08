@@ -41,11 +41,44 @@ public class Entry : MonoBehaviour
 
     private void LoadFeedDirectPlayScene()
     {
-        LoadDefaultScene();
+        switch (AdeSDK.Instance.CurrentFeedRepeatSceneType)
+        {
+            case FeedRepeatSceneType.OfflineReward:
+                LoadFeedOfflineRewardScene();
+                return;
+            case FeedRepeatSceneType.EnergyRecovery:
+                LoadFeedEnergyRecoveryScene();
+                return;
+            default:
+                LoadFeedImportantEventScene();
+                return;
+        }
+    }
+
+    private void LoadFeedOfflineRewardScene()
+    {
+        LoadConfiguredFeedScene();
+    }
+
+    private void LoadFeedEnergyRecoveryScene()
+    {
+        LoadConfiguredFeedScene();
+    }
+
+    private void LoadFeedImportantEventScene()
+    {
+        LoadConfiguredFeedScene();
+    }
+
+    private void LoadConfiguredFeedScene()
+    {
+        SceneManager.LoadScene(2);
+        AdeSDK.Instance.ReportFeedSceneReady();
+        AdeSDK.Instance.StoreFeedData();
     }
 
     private void LoadFeedAcquisitionScene()
     {
-        LoadDefaultScene();
+        LoadConfiguredFeedScene();
     }
 }
